@@ -6,8 +6,12 @@ pipeline {
         nodejs 'node16'
     }
 
-    stages {
+    environment {
+        DOCKER_IMAGE = 'mohitdevops97/starbucks'
+        IMAGE_TAG    = 'latest'
+    }
 
+    stages {
         stage('Clean Workspace') {
             steps {
                 cleanWs()
@@ -29,24 +33,31 @@ pipeline {
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t starbucks:latest .'
-            }
-        }
-
-        stage('Tag Docker Image') {
-            steps {
-                sh 'docker tag starbucks:latest mohitdevops97/starbucks:latest'
+                // Build with the final tag directly — no separate tag stage needed
+                sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 script {
-                    withDockerRegistry([credentialsId: 'docker', url: '']) {
-                        sh 'docker push mohitdevops97/starbucks:latest'
+                    withDockerRegistry(credentialsId: 'docker', url: 'https://index.docker.io/v1/') {
+                        sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
                     }
                 }
             }
+        }
+    }
+
+    post {
+        success {
+            echo "✅ Image pushed successfully: ${DOCKER_IMAGE}:${IMAGE_TAG}"
+        }
+        failure {
+            echo "❌ Pipeline failed — check Docker Hub credentials or build logs."
+        }
+        always {
+            sh "docker image prune -f"  // cleanup dangling/local images to save disk
         }
     }
 }
